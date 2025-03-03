@@ -1,8 +1,8 @@
-package usersHandler
+package handlers
 
 import (
-	usersModel "gin-api/internal/models/users"
-	usersService "gin-api/internal/services/users"
+	"gin-api/internal/models"
+	"gin-api/internal/services"
 	"net/http"
 	"strconv"
 
@@ -10,10 +10,10 @@ import (
 )
 
 type UserHandler struct {
-	userService *usersService.UserService
+	userService *services.UserService
 }
 
-func NewUserHandler(userService *usersService.UserService) *UserHandler {
+func NewUserHandler(userService *services.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
@@ -29,7 +29,7 @@ func (h *UserHandler) GetAllUsers(c *gin.Context) {
 
 // CreateUser handles creating a new user
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	var user usersModel.User
+	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -68,7 +68,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var user usersModel.User
+	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
