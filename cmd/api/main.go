@@ -2,10 +2,7 @@ package main
 
 import (
 	"gin-api/internal/config"
-	routesHandler "gin-api/internal/handlers"
-	usersHandler "gin-api/internal/handlers/users"
-	usersRepository "gin-api/internal/repositories/users"
-	usersService "gin-api/internal/services/users"
+	"gin-api/internal/routes"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -22,20 +19,11 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	// Initialize repositories
-	userRepo := usersRepository.NewUserRepository(dbpool)
-
-	// Initialize services
-	userService := usersService.NewUserService(userRepo)
-
-	// Initialize handlers
-	userHandler := usersHandler.NewUserHandler(userService)
-
 	// Initialize Gin
 	r := gin.Default()
 
-	// Setup routes
-	routesHandler.SetupRoutes(r, userHandler)
+	// Set up routes with dbpool
+	routes.SetupRoutes(r, dbpool)
 
 	// Start the server
 	if err := r.Run(cfg.ServerAddress); err != nil {
