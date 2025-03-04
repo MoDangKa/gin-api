@@ -2,13 +2,20 @@ package main
 
 import (
 	"gin-api/internal/config"
-	"gin-api/internal/handlers"
-	"gin-api/internal/repositories"
-	"gin-api/internal/services"
+	"gin-api/internal/routes"
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+}
 
 func main() {
 	// Load configuration
@@ -21,16 +28,11 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	// Initialize repository, service, and handler
-	userRepo := repositories.NewUserRepository(dbpool)
-	userService := services.NewUserService(userRepo)
-	handler := handlers.NewHandler(userService)
-
 	// Initialize Gin
 	r := gin.Default()
 
-	// Setup routes
-	handler.SetupRoutes(r)
+	// Set up routes with dbpool
+	routes.SetupRoutes(r, dbpool)
 
 	// Start the server
 	if err := r.Run(cfg.ServerAddress); err != nil {

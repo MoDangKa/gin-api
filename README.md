@@ -10,8 +10,8 @@ This is a Gin API project.
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/gin-api-project.git
-    cd gin-api-project
+    https://github.com/MoDangKa/gin-api.git
+    cd gin-api
     ```
 
 2. Install dependencies:
@@ -23,7 +23,7 @@ This is a Gin API project.
 
 1. Run the server:
     ```sh
-    go run main.go
+    go run cmd/api/main.go
     ```
 
 2. The server will start at `http://localhost:8080`.
