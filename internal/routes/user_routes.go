@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"gin-api/internal/handlers"
+	"gin-api/internal/controllers"
 	"gin-api/internal/middlewares"
 	"gin-api/internal/repositories"
 	"gin-api/internal/services"
@@ -13,21 +13,18 @@ import (
 func RegisterUserRoutes(router *gin.Engine, dbpool *pgxpool.Pool) {
 	userRepo := repositories.NewUserRepository(dbpool)
 	userService := services.NewUserService(userRepo)
-	userHandler := handlers.NewUserHandler(userService)
+	userController := controllers.NewUserController(userService)
 
-	// Define user routes
 	userRoutes := router.Group("/users")
+	userRoutes.POST("/", userController.CreateUser)
+	userRoutes.POST("/login", userController.LogIn)
 
-	// Public route: Get all users
-	userRoutes.GET("/", userHandler.GetAllUsers)
-
-	// Protected routes: Apply AuthMiddleware
 	protectedRoutes := userRoutes.Group("/")
-	protectedRoutes.Use(middlewares.AuthMiddleware())
+	protectedRoutes.Use(middlewares.Auth(), middlewares.IsAdmin())
 	{
-		protectedRoutes.POST("/", userHandler.CreateUser)
-		protectedRoutes.GET("/:id", userHandler.GetUserByID)
-		protectedRoutes.PUT("/:id", userHandler.UpdateUser)
-		protectedRoutes.DELETE("/:id", userHandler.DeleteUser)
+		protectedRoutes.GET("/", userController.GetAllUsers)
+		protectedRoutes.GET("/:id", userController.GetUserByID)
+		protectedRoutes.PUT("/:id", userController.UpdateUser)
+		protectedRoutes.DELETE("/:id", userController.DeleteUser)
 	}
 }
