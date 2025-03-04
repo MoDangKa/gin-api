@@ -32,3 +32,7 @@ func (s *UserService) UpdateUser(user *models.User) error {
 func (s *UserService) DeleteUser(id int) error {
 	return s.userRepo.DeleteUser(id)
 }
+
+func (s *UserService) LogIn(username string, password string) (*models.UserWithToken, error) {
+	return s.userRepo.LogIn(username, password)
+}
