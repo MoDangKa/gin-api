@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
-func Auth() gin.HandlerFunc {
+func Protect() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -59,7 +60,7 @@ func validateToken(tokenString string) (jwt.MapClaims, error) {
 	}
 }
 
-func IsAdmin() gin.HandlerFunc {
+func RestrictTo(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, exists := c.Get("claims")
 		if !exists {
@@ -75,9 +76,17 @@ func IsAdmin() gin.HandlerFunc {
 			return
 		}
 
-		isAdmin, ok := mapClaims["admin"].(bool)
-		if !ok || !isAdmin {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: admin privileges required"})
+		role, ok := mapClaims["role"].(string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: role privileges required"})
+			c.Abort()
+			return
+		}
+
+		hasRole := slices.Contains(roles, role)
+
+		if !hasRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: you do not have permission to perform this action"})
 			c.Abort()
 			return
 		}

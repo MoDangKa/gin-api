@@ -2,15 +2,11 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"gin-api/internal/models"
 	"gin-api/pkg/utils"
-	"log"
-	"os"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,7 +19,7 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 }
 
 func (r *UserRepository) GetAllUsers() ([]models.User, error) {
-	query := `SELECT id, username, password, avatar, is_admin, created_at, updated_at FROM users`
+	query := `SELECT id, email, password, name, photo, role, active, created_at, updated_at FROM users`
 	rows, err := r.db.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query users: %w", err)
@@ -33,7 +29,7 @@ func (r *UserRepository) GetAllUsers() ([]models.User, error) {
 	var userList []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Password, &user.Avatar, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.Password, &user.Name, &user.Photo, &user.Role, &user.Active, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
 		userList = append(userList, user)
@@ -53,21 +49,29 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	}
 	user.Password = hashedPassword
 
+	now := time.Now()
+
 	query := `
-        INSERT INTO users (username, password, avatar, is_admin, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
+        INSERT INTO users (email, password, name, photo, role, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, active, created_at, updated_at
     `
 	err = r.db.QueryRow(
 		context.Background(),
 		query,
-		user.Username,
+		user.Email,
 		user.Password,
-		user.Avatar,
-		user.IsAdmin,
-		time.Now(),
-		time.Now(),
-	).Scan(&user.ID)
+		user.Name,
+		user.Photo,
+		user.Role,
+		now,
+		now,
+	).Scan(
+		&user.ID,
+		&user.Active,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -75,14 +79,15 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 }
 
 func (r *UserRepository) GetUserByID(id int) (*models.User, error) {
-	query := `SELECT id, username, password, avatar, is_admin, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, password, name, photo, role, created_at, updated_at FROM users WHERE id = $1`
 	var user models.User
 	err := r.db.QueryRow(context.Background(), query, id).Scan(
 		&user.ID,
-		&user.Username,
+		&user.Email,
 		&user.Password,
-		&user.Avatar,
-		&user.IsAdmin,
+		&user.Name,
+		&user.Photo,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -95,15 +100,16 @@ func (r *UserRepository) GetUserByID(id int) (*models.User, error) {
 func (r *UserRepository) UpdateUser(user *models.User) error {
 	query := `
 		UPDATE users
-		SET password = $1, avatar = $2, is_admin = $3, updated_at = $4
-		WHERE id = $5, 
+		SET password = $1, name = $2, photo = $3, role = $4, updated_at = $5
+		WHERE id = $6, 
 	`
 	_, err := r.db.Exec(
 		context.Background(),
 		query,
 		user.Password,
-		user.Avatar,
-		user.IsAdmin,
+		user.Name,
+		user.Photo,
+		user.Role,
 		time.Now(),
 		user.ID,
 	)
@@ -120,51 +126,4 @@ func (r *UserRepository) DeleteUser(id int) error {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 	return nil
-}
-
-func (r *UserRepository) LogIn(username, password string) (*models.UserWithToken, error) {
-	query := `SELECT id, username, password, avatar, is_admin, created_at, updated_at FROM users WHERE username = $1`
-	var user models.User
-
-	err := r.db.QueryRow(context.Background(), query, username).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Password,
-		&user.Avatar,
-		&user.IsAdmin,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
-	if err != nil {
-		log.Printf("Error fetching user: %v", err)
-		return nil, fmt.Errorf("incorrect username or password")
-	}
-
-	if !utils.CheckPassword(password, user.Password) {
-		return nil, errors.New("incorrect username or password")
-	}
-
-	claims := jwt.MapClaims{
-		"username": user.Username,
-		"admin":    user.IsAdmin,
-		"exp":      time.Now().Add(time.Hour * 72).Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	secretKey := []byte(os.Getenv("JWT_SECRET_KEY"))
-	tokenString, err := token.SignedString(secretKey)
-	if err != nil {
-		log.Printf("Error signing token: %v", err)
-
-		return nil, fmt.Errorf("could not generate token")
-	}
-
-	result := models.UserWithToken{
-		User:  user,
-		Token: tokenString,
-	}
-
-	return &result, nil
 }

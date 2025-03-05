@@ -18,14 +18,6 @@ func NewUserController(userService *services.UserService) *UserController {
 }
 
 func (h *UserController) GetAllUsers(c *gin.Context) {
-	// claims, exists := c.Get("claims")
-	// if !exists {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-	// 	c.Abort()
-	// 	return
-	// }
-	// fmt.Println("claims: ", claims)
-
 	users, err := h.userService.GetAllUsers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -100,29 +92,4 @@ func (h *UserController) DeleteUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
-}
-
-func (h *UserController) LogIn(c *gin.Context) {
-	var loginRequest struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&loginRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	userWithToken, err := h.userService.LogIn(loginRequest.Username, loginRequest.Password)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	response := gin.H{
-		"user":  userWithToken.User,
-		"token": userWithToken.Token,
-	}
-
-	c.JSON(http.StatusOK, response)
 }

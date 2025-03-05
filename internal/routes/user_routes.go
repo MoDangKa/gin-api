@@ -10,21 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RegisterUserRoutes(router *gin.Engine, dbpool *pgxpool.Pool) {
+func RegisterUserRoutes(r *gin.Engine, dbpool *pgxpool.Pool) {
 	userRepo := repositories.NewUserRepository(dbpool)
 	userService := services.NewUserService(userRepo)
 	userController := controllers.NewUserController(userService)
 
-	userRoutes := router.Group("/users")
-	userRoutes.POST("/", userController.CreateUser)
-	userRoutes.POST("/login", userController.LogIn)
+	r.POST("/register", userController.CreateUser)
 
-	protectedRoutes := userRoutes.Group("/")
-	protectedRoutes.Use(middlewares.Auth(), middlewares.IsAdmin())
+	userRoutes := r.Group("/users")
+	userRoutes.Use(middlewares.Protect(), middlewares.RestrictTo("guide", "admin"))
 	{
-		protectedRoutes.GET("/", userController.GetAllUsers)
-		protectedRoutes.GET("/:id", userController.GetUserByID)
-		protectedRoutes.PUT("/:id", userController.UpdateUser)
-		protectedRoutes.DELETE("/:id", userController.DeleteUser)
+		userRoutes.GET("/", userController.GetAllUsers)
+		userRoutes.GET("/:id", userController.GetUserByID)
+		userRoutes.PUT("/:id", userController.UpdateUser)
+		userRoutes.DELETE("/:id", userController.DeleteUser)
 	}
 }
