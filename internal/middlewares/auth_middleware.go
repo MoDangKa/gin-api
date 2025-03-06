@@ -2,15 +2,17 @@ package middlewares
 
 import (
 	"fmt"
+	"gin-api/internal/repositories"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
-func Auth() gin.HandlerFunc {
+func Protect(authRepo *repositories.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -33,6 +35,20 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
+		email := claims["email"].(string)
+		isActive, err := authRepo.IsActive(email)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Error checking user active status"})
+			c.Abort()
+			return
+		}
+
+		if !isActive {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not active"})
+			c.Abort()
+			return
+		}
+
 		c.Set("claims", claims)
 		c.Next()
 	}
@@ -49,7 +65,7 @@ func validateToken(tokenString string) (jwt.MapClaims, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing token: %w", err)
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
@@ -59,7 +75,7 @@ func validateToken(tokenString string) (jwt.MapClaims, error) {
 	}
 }
 
-func IsAdmin() gin.HandlerFunc {
+func RestrictTo(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, exists := c.Get("claims")
 		if !exists {
@@ -75,9 +91,15 @@ func IsAdmin() gin.HandlerFunc {
 			return
 		}
 
-		isAdmin, ok := mapClaims["admin"].(bool)
-		if !ok || !isAdmin {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: admin privileges required"})
+		role, ok := mapClaims["role"].(string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: role privileges required"})
+			c.Abort()
+			return
+		}
+
+		if !slices.Contains(roles, role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: you do not have permission to perform this action"})
 			c.Abort()
 			return
 		}

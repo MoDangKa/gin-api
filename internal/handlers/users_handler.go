@@ -1,4 +1,4 @@
-package controllers
+package handlers
 
 import (
 	"gin-api/internal/models"
@@ -9,23 +9,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type UserController struct {
+type UserHandler struct {
 	userService *services.UserService
 }
 
-func NewUserController(userService *services.UserService) *UserController {
-	return &UserController{userService: userService}
+func NewUserHandler(userService *services.UserService) *UserHandler {
+	return &UserHandler{userService: userService}
 }
 
-func (h *UserController) GetAllUsers(c *gin.Context) {
-	// claims, exists := c.Get("claims")
-	// if !exists {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-	// 	c.Abort()
-	// 	return
-	// }
-	// fmt.Println("claims: ", claims)
-
+func (h *UserHandler) GetAllUsers(c *gin.Context) {
 	users, err := h.userService.GetAllUsers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -34,7 +26,7 @@ func (h *UserController) GetAllUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"users": users})
 }
 
-func (h *UserController) CreateUser(c *gin.Context) {
+func (h *UserHandler) CreateUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -46,10 +38,18 @@ func (h *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"user": user})
+	newUser := models.UserResponse{
+		ID:    user.ID,
+		Email: user.Email,
+		Name:  user.Name,
+		Photo: user.Photo,
+		Role:  user.Role,
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"user": newUser})
 }
 
-func (h *UserController) GetUserByID(c *gin.Context) {
+func (h *UserHandler) GetUserByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
@@ -65,7 +65,7 @@ func (h *UserController) GetUserByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
-func (h *UserController) UpdateUser(c *gin.Context) {
+func (h *UserHandler) UpdateUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
@@ -87,7 +87,7 @@ func (h *UserController) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
-func (h *UserController) DeleteUser(c *gin.Context) {
+func (h *UserHandler) DeleteUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
@@ -102,27 +102,45 @@ func (h *UserController) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
 }
 
-func (h *UserController) LogIn(c *gin.Context) {
-	var loginRequest struct {
-		Username string `json:"username" binding:"required"`
+func (h *UserHandler) LogIn(c *gin.Context) {
+	var request struct {
+		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&loginRequest); err != nil {
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	userWithToken, err := h.userService.LogIn(loginRequest.Username, loginRequest.Password)
+	result, err := h.userService.LogIn(request.Email, request.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
 	response := gin.H{
-		"user":  userWithToken.User,
-		"token": userWithToken.Token,
+		"user":  result.User,
+		"token": result.Token,
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *UserHandler) ForgotPassword(c *gin.Context) {
+	var request struct {
+		Email string `json:"email" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.userService.ForgotPassword(c.Request, request.Email); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "please check your email"})
 }
