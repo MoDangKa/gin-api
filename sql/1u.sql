@@ -9,6 +9,8 @@ CREATE TABLE
         photo TEXT,
         role TEXT DEFAULT 'user' CHECK (role IN ('user', 'guide', 'admin')),
         active BOOLEAN DEFAULT TRUE,
+        password_reset_token TEXT,
+        password_reset_expires TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW (),
         updated_at TIMESTAMP DEFAULT NOW ()
     );
