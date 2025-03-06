@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"fmt"
+	"gin-api/internal/repositories"
 	"net/http"
 	"os"
 	"slices"
@@ -11,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Protect() gin.HandlerFunc {
+func Protect(authRepo *repositories.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -34,6 +35,20 @@ func Protect() gin.HandlerFunc {
 			return
 		}
 
+		email := claims["email"].(string)
+		isActive, err := authRepo.IsActive(email)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Error checking user active status"})
+			c.Abort()
+			return
+		}
+
+		if !isActive {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User is not active"})
+			c.Abort()
+			return
+		}
+
 		c.Set("claims", claims)
 		c.Next()
 	}
@@ -50,7 +65,7 @@ func validateToken(tokenString string) (jwt.MapClaims, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing token: %w", err)
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
@@ -83,9 +98,7 @@ func RestrictTo(roles ...string) gin.HandlerFunc {
 			return
 		}
 
-		hasRole := slices.Contains(roles, role)
-
-		if !hasRole {
+		if !slices.Contains(roles, role) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: you do not have permission to perform this action"})
 			c.Abort()
 			return
