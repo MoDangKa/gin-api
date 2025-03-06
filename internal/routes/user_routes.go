@@ -17,6 +17,7 @@ func RegisterUserRoutes(r *gin.Engine, dbpool *pgxpool.Pool, authRepo *repositor
 
 	r.POST("/register", userHandler.CreateUser)
 	r.POST("/login", userHandler.LogIn)
+	r.POST("/forgot-password", userHandler.ForgotPassword)
 
 	userRoutes := r.Group("/users")
 	userRoutes.Use(middlewares.Protect(authRepo), middlewares.RestrictTo("guide", "admin"))

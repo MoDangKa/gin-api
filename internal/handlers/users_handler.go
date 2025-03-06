@@ -38,7 +38,15 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"user": user})
+	newUser := models.UserResponse{
+		ID:    user.ID,
+		Email: user.Email,
+		Name:  user.Name,
+		Photo: user.Photo,
+		Role:  user.Role,
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"user": newUser})
 }
 
 func (h *UserHandler) GetUserByID(c *gin.Context) {
@@ -117,4 +125,22 @@ func (h *UserHandler) LogIn(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *UserHandler) ForgotPassword(c *gin.Context) {
+	var request struct {
+		Email string `json:"email" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.userService.ForgotPassword(c.Request, request.Email); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "please check your email"})
 }

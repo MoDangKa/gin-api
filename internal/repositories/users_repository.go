@@ -7,6 +7,7 @@ import (
 	"gin-api/internal/models"
 	"gin-api/pkg/utils"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -51,12 +52,17 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
+
 	user.Password = hashedPassword
+
+	if user.Role == "" {
+		user.Role = "user"
+	}
 
 	query := `
         INSERT INTO users (email, password, name, photo, role)
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, active, created_at, updated_at
+        RETURNING id, photo, role
     `
 	err = r.db.QueryRow(
 		context.Background(),
@@ -68,9 +74,8 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 		user.Role,
 	).Scan(
 		&user.ID,
-		&user.Active,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&user.Photo,
+		&user.Role,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
@@ -80,7 +85,9 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 
 func (r *UserRepository) GetUserByID(id int) (*models.User, error) {
 	query := `SELECT id, email, password, name, photo, role, created_at, updated_at FROM users WHERE id = $1`
+
 	var user models.User
+
 	err := r.db.QueryRow(context.Background(), query, id).Scan(
 		&user.ID,
 		&user.Email,
@@ -100,18 +107,18 @@ func (r *UserRepository) GetUserByID(id int) (*models.User, error) {
 func (r *UserRepository) UpdateUser(user *models.User) error {
 	query := `
 		UPDATE users
-		SET password = $1, name = $2, photo = $3, role = $4, updated_at = $5
-		WHERE id = $6, 
+		SET password = $2, name = $3, photo = $4, role = $5, updated_at = $6
+		WHERE id = $1, 
 	`
 	_, err := r.db.Exec(
 		context.Background(),
 		query,
+		user.ID,
 		user.Password,
 		user.Name,
 		user.Photo,
 		user.Role,
 		time.Now(),
-		user.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
@@ -130,7 +137,9 @@ func (r *UserRepository) DeleteUser(id int) error {
 
 func (r *UserRepository) LogIn(email string, password string) (*models.UserWithToken, error) {
 	query := `SELECT id, email, password, name, photo, role, active, created_at, updated_at FROM users WHERE email = $1 AND active = true`
+
 	var user models.User
+
 	err := r.db.QueryRow(context.Background(), query, email).Scan(
 		&user.ID,
 		&user.Email,
@@ -174,4 +183,39 @@ func (r *UserRepository) LogIn(email string, password string) (*models.UserWithT
 	}
 
 	return &result, nil
+}
+
+func (r *UserRepository) ForgotPassword(req *http.Request, email string) error {
+	query := `
+        UPDATE users
+        SET password_reset_token = $2, password_reset_expires = $3, updated_at = $4
+        WHERE email = $1
+    `
+
+	var user models.User
+	resetToken, err := utils.CreatePasswordResetToken(&user)
+	fmt.Println(resetToken)
+	if err != nil {
+		return fmt.Errorf("failed to create password reset token: %w", err)
+	}
+	_, err = r.db.Exec(
+		context.Background(),
+		query,
+		email,
+		user.PasswordResetToken,
+		user.PasswordResetExpires,
+		time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("there is no user with that email address: %w", err)
+	}
+
+	resetURL := utils.GetResetURL(req, resetToken)
+
+	if err := utils.SendPasswordResetEmail(email, resetURL); err != nil {
+		return fmt.Errorf("failed to send password reset email: %w", err)
+	}
+
+	fmt.Println("Password reset token generated and email sent:", resetToken)
+	return nil
 }

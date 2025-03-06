@@ -3,6 +3,7 @@ package services
 import (
 	"gin-api/internal/models"
 	"gin-api/internal/repositories"
+	"net/http"
 )
 
 type UserService struct {
@@ -35,4 +36,8 @@ func (s *UserService) DeleteUser(id int) error {
 
 func (s *UserService) LogIn(email string, password string) (*models.UserWithToken, error) {
 	return s.userRepo.LogIn(email, password)
+}
+
+func (s *UserService) ForgotPassword(req *http.Request, email string) error {
+	return s.userRepo.ForgotPassword(req, email)
 }
