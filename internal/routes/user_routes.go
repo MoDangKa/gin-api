@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"gin-api/internal/controllers"
+	"gin-api/internal/handlers"
 	"gin-api/internal/middlewares"
 	"gin-api/internal/repositories"
 	"gin-api/internal/services"
@@ -10,19 +10,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RegisterUserRoutes(r *gin.Engine, dbpool *pgxpool.Pool) {
+func RegisterUserRoutes(r *gin.Engine, dbpool *pgxpool.Pool, authRepo *repositories.AuthRepository) {
 	userRepo := repositories.NewUserRepository(dbpool)
 	userService := services.NewUserService(userRepo)
-	userController := controllers.NewUserController(userService)
+	userHandler := handlers.NewUserHandler(userService)
 
-	r.POST("/register", userController.CreateUser)
+	r.POST("/register", userHandler.CreateUser)
+	r.POST("/login", userHandler.LogIn)
 
 	userRoutes := r.Group("/users")
-	userRoutes.Use(middlewares.Protect(), middlewares.RestrictTo("guide", "admin"))
+	userRoutes.Use(middlewares.Protect(authRepo), middlewares.RestrictTo("guide", "admin"))
 	{
-		userRoutes.GET("/", userController.GetAllUsers)
-		userRoutes.GET("/:id", userController.GetUserByID)
-		userRoutes.PUT("/:id", userController.UpdateUser)
-		userRoutes.DELETE("/:id", userController.DeleteUser)
+		userRoutes.GET("/", userHandler.GetAllUsers)
+		userRoutes.GET("/:id", userHandler.GetUserByID)
+		userRoutes.PUT("/:id", userHandler.UpdateUser)
+		userRoutes.DELETE("/:id", userHandler.DeleteUser)
 	}
 }

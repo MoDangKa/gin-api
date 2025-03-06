@@ -2,11 +2,15 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gin-api/internal/models"
 	"gin-api/pkg/utils"
+	"log"
+	"os"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,11 +53,9 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	}
 	user.Password = hashedPassword
 
-	now := time.Now()
-
 	query := `
-        INSERT INTO users (email, password, name, photo, role, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO users (email, password, name, photo, role)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id, active, created_at, updated_at
     `
 	err = r.db.QueryRow(
@@ -64,8 +66,6 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 		user.Name,
 		user.Photo,
 		user.Role,
-		now,
-		now,
 	).Scan(
 		&user.ID,
 		&user.Active,
@@ -126,4 +126,52 @@ func (r *UserRepository) DeleteUser(id int) error {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 	return nil
+}
+
+func (r *UserRepository) LogIn(email string, password string) (*models.UserWithToken, error) {
+	query := `SELECT id, email, password, name, photo, role, active, created_at, updated_at FROM users WHERE email = $1 AND active = true`
+	var user models.User
+	err := r.db.QueryRow(context.Background(), query, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Password,
+		&user.Name,
+		&user.Photo,
+		&user.Role,
+		&user.Active,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		log.Printf("Error fetching user: %v", err)
+		return nil, fmt.Errorf("incorrect email or password")
+	}
+
+	if !utils.CheckPassword(password, user.Password) {
+		return nil, errors.New("incorrect email or password")
+	}
+
+	claims := jwt.MapClaims{
+		"email": user.Email,
+		"role":  user.Role,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	secretKey := []byte(os.Getenv("JWT_SECRET_KEY"))
+	tokenString, err := token.SignedString(secretKey)
+	if err != nil {
+		log.Printf("Error signing token: %v", err)
+
+		return nil, fmt.Errorf("could not generate token")
+	}
+
+	result := models.UserWithToken{
+		User:  user,
+		Token: tokenString,
+	}
+
+	return &result, nil
 }
