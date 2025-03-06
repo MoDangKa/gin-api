@@ -18,3 +18,4 @@ go.sum
 # Binary Output directories
 /bin
 /vendor
+/logs

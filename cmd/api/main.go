@@ -3,10 +3,12 @@ package main
 import (
 	"gin-api/internal/config"
 	"gin-api/internal/routes"
+	"gin-api/pkg/utils"
 	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func init() {
@@ -27,6 +29,14 @@ func main() {
 
 	r := gin.Default()
 
+	log.SetOutput(&lumberjack.Logger{
+		Filename:   utils.GetLogFilename(),
+		MaxSize:    10,
+		MaxAge:     14,
+		MaxBackups: 3,
+		Compress:   true,
+	})
+	r.Use(gin.LoggerWithWriter(log.Writer()))
 	r.Use(config.LimitBodySize(10 * 1024))
 
 	routes.SetupRoutes(r, dbpool)
