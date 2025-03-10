@@ -41,3 +41,11 @@ func (s *UserService) LogIn(email string, password string) (*models.UserWithToke
 func (s *UserService) ForgotPassword(req *http.Request, email string) error {
 	return s.userRepo.ForgotPassword(req, email)
 }
+
+func (s *UserService) ResetPassword(email string, newPassword string) error {
+	return s.userRepo.ResetPassword(email, newPassword)
+}
+
+func (s *UserService) ResetPasswordByToken(resetToken string, newPassword string) error {
+	return s.userRepo.ResetPasswordByToken(resetToken, newPassword)
+}

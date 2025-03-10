@@ -219,3 +219,73 @@ func (r *UserRepository) ForgotPassword(req *http.Request, email string) error {
 	fmt.Println("Password reset token generated and email sent:", resetToken)
 	return nil
 }
+
+func (r *UserRepository) ResetPassword(email string, newPassword string) error {
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	query2 := `
+	UPDATE users
+	SET password = $2, password_reset_token = NULL, password_reset_expires = NULL, updated_at = $3
+	WHERE email = $1
+`
+
+	if _, err := r.db.Exec(
+		context.Background(),
+		query2,
+		email,
+		hashedPassword,
+		time.Now(),
+	); err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+}
+
+func (r *UserRepository) ResetPasswordByToken(resetToken string, newPassword string) error {
+	hashedToken, err := utils.HashToken(resetToken)
+	if err != nil {
+		return fmt.Errorf("error hashing token: %w", err)
+	}
+
+	query1 := `SELECT id, password_reset_expires FROM users WHERE password_reset_token = $1`
+	var user models.User
+
+	if err := r.db.QueryRow(context.Background(), query1, hashedToken).Scan(
+		&user.ID,
+		&user.PasswordResetExpires,
+	); err != nil {
+		log.Printf("Error fetching user: %v", err)
+		return fmt.Errorf("invalid or expired token")
+	}
+
+	if time.Now().After(user.PasswordResetExpires) {
+		return fmt.Errorf("token has expired")
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	query2 := `
+        UPDATE users
+        SET password = $2, password_reset_token = NULL, password_reset_expires = NULL, updated_at = $3
+        WHERE id = $1
+    `
+
+	if _, err := r.db.Exec(
+		context.Background(),
+		query2,
+		user.ID,
+		hashedPassword,
+		time.Now(),
+	); err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+}

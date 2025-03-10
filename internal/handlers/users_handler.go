@@ -3,6 +3,8 @@ package handlers
 import (
 	"gin-api/internal/models"
 	"gin-api/internal/services"
+	"gin-api/pkg/utils"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -30,6 +32,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(user.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters"})
 		return
 	}
 
@@ -143,4 +150,70 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "please check your email"})
+}
+
+func (h *UserHandler) ResetPassword(c *gin.Context) {
+	claims, err := utils.GetClaims(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.Abort()
+		return
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: role privileges required"})
+		c.Abort()
+		return
+	}
+
+	var request struct {
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(request.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters"})
+		return
+	}
+
+	if err := h.userService.ResetPassword(email, request.Password); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+}
+
+func (h *UserHandler) ResetPasswordByToken(c *gin.Context) {
+	resetToken := c.Param("resetToken")
+
+	var request struct {
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(request.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters"})
+		return
+	}
+
+	if err := h.userService.ResetPasswordByToken(resetToken, request.Password); err != nil {
+		log.Printf("ResetPassword error: %v", err)
+		if err.Error() == "invalid or expired token" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
 }

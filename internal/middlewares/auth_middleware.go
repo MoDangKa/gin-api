@@ -3,6 +3,7 @@ package middlewares
 import (
 	"fmt"
 	"gin-api/internal/repositories"
+	"gin-api/pkg/utils"
 	"net/http"
 	"os"
 	"slices"
@@ -77,21 +78,14 @@ func validateToken(tokenString string) (jwt.MapClaims, error) {
 
 func RestrictTo(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		claims, exists := c.Get("claims")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		claims, err := utils.GetClaims(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
 			return
 		}
 
-		mapClaims, ok := claims.(jwt.MapClaims)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
-			c.Abort()
-			return
-		}
-
-		role, ok := mapClaims["role"].(string)
+		role, ok := claims["role"].(string)
 		if !ok {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: role privileges required"})
 			c.Abort()
