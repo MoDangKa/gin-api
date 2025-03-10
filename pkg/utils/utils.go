@@ -2,12 +2,15 @@ package utils
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"gin-api/internal/models"
+	"log"
 	"net/http"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 )
 
 func PrintMessage(message string) {
@@ -20,45 +23,34 @@ func GetLogFilename() string {
 }
 
 func CreatePasswordResetToken(user *models.User) (string, error) {
-	tokenBytes := make([]byte, 32)
-	_, err := rand.Read(tokenBytes)
+	resetToken, err := GenerateToken(32)
 	if err != nil {
-		return "", fmt.Errorf("error generating token: %w", err)
+		return "", fmt.Errorf("failed to generate password reset token: %w", err)
 	}
-	resetToken := hex.EncodeToString(tokenBytes)
 
-	hash := sha256.New()
-	_, err = hash.Write([]byte(resetToken))
+	hashedToken, err := HashToken(resetToken)
 	if err != nil {
-		return "", fmt.Errorf("error hashing token: %w", err)
+		return "", fmt.Errorf("failed to hash password reset token: %w", err)
 	}
-	hashedToken := hex.EncodeToString(hash.Sum(nil))
 
 	user.PasswordResetToken = hashedToken
 	user.PasswordResetExpires = time.Now().Add(10 * time.Minute)
 
-	fmt.Printf("Reset Token: %s\nHashed Token: %s\n", resetToken, user.PasswordResetToken)
+	log.Printf("Password reset token successfully created for user ID: %d", user.ID)
 
 	return resetToken, nil
 }
 
-func DecodeResetToken(user *models.User, resetToken string) (bool, error) {
-	hash := sha256.New()
-	_, err := hash.Write([]byte(resetToken))
-	if err != nil {
-		return false, fmt.Errorf("error hashing token: %w", err)
-	}
-	hashedToken := hex.EncodeToString(hash.Sum(nil))
+func GenerateToken(tokenLength int) (string, error) {
+	tokenBytes := make([]byte, tokenLength)
 
-	if hashedToken != user.PasswordResetToken {
-		return false, fmt.Errorf("invalid or expired token")
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("error generating token: %w", err)
 	}
 
-	if time.Now().After(user.PasswordResetExpires) {
-		return false, fmt.Errorf("token has expired")
-	}
+	token := hex.EncodeToString(tokenBytes)
 
-	return true, nil
+	return token, nil
 }
 
 func GetResetURL(req *http.Request, resetToken string) string {
@@ -71,4 +63,18 @@ func GetResetURL(req *http.Request, resetToken string) string {
 
 	resetURL := fmt.Sprintf("%s://%s/reset-password/%s", protocol, host, resetToken)
 	return resetURL
+}
+
+func GetClaims(c *gin.Context) (jwt.MapClaims, error) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		return nil, fmt.Errorf("authorization header missing")
+	}
+
+	mapClaims, ok := claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims")
+	}
+
+	return mapClaims, nil
 }
