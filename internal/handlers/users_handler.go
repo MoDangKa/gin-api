@@ -152,7 +152,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "please check your email"})
 }
 
-func (h *UserHandler) ResetPassword(c *gin.Context) {
+func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	claims, err := utils.GetClaims(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -181,15 +181,15 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.ResetPassword(email, request.Password); err != nil {
+	if err := h.userService.UpdatePassword(email, request.Password); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+	c.JSON(http.StatusOK, gin.H{"message": "Password updated successful"})
 }
 
-func (h *UserHandler) ResetPasswordByToken(c *gin.Context) {
+func (h *UserHandler) ResetPassword(c *gin.Context) {
 	resetToken := c.Param("resetToken")
 
 	var request struct {
@@ -205,8 +205,8 @@ func (h *UserHandler) ResetPasswordByToken(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.ResetPasswordByToken(resetToken, request.Password); err != nil {
-		log.Printf("ResetPassword error: %v", err)
+	if err := h.userService.ResetPassword(resetToken, request.Password); err != nil {
+		log.Printf("UpdatePassword error: %v", err)
 		if err.Error() == "invalid or expired token" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		} else {

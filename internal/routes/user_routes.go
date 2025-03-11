@@ -20,17 +20,15 @@ func RegisterUserRoutes(r *gin.Engine, dbpool *pgxpool.Pool, authRepo *repositor
 	userService := services.NewUserService(userRepo)
 	userHandler := handlers.NewUserHandler(userService)
 
-	// Public routes
 	r.POST("/register", userHandler.CreateUser)
 	r.POST("/login", userHandler.LogIn)
 	r.POST("/forgot-password", userHandler.ForgotPassword)
-	r.POST("/reset-password/:resetToken", userHandler.ResetPasswordByToken)
+	r.POST("/reset-password/:resetToken", userHandler.ResetPassword)
 
-	// Protected routes
 	protected := r.Group("/")
 	protected.Use(middlewares.Protect(authRepo))
 
-	protected.POST("/reset-password", userHandler.ResetPassword)
+	protected.POST("/update-password", userHandler.UpdatePassword)
 
 	userRoutes := protected.Group("/users")
 	userRoutes.Use(middlewares.RestrictTo(RoleGuide, RoleAdmin))

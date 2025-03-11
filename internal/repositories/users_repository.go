@@ -220,7 +220,7 @@ func (r *UserRepository) ForgotPassword(req *http.Request, email string) error {
 	return nil
 }
 
-func (r *UserRepository) ResetPassword(email string, newPassword string) error {
+func (r *UserRepository) UpdatePassword(email string, newPassword string) error {
 	hashedPassword, err := utils.HashPassword(newPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
@@ -245,7 +245,7 @@ func (r *UserRepository) ResetPassword(email string, newPassword string) error {
 	return nil
 }
 
-func (r *UserRepository) ResetPasswordByToken(resetToken string, newPassword string) error {
+func (r *UserRepository) ResetPassword(resetToken string, newPassword string) error {
 	hashedToken, err := utils.HashToken(resetToken)
 	if err != nil {
 		return fmt.Errorf("error hashing token: %w", err)
