@@ -8,7 +8,7 @@ import (
 )
 
 func SendPasswordResetEmail(to, resetURL string) error {
-	gmailName := os.Getenv("GMAIL_Name")
+	gmailName := os.Getenv("GMAIL_NAME")
 	gmailUsername := os.Getenv("GMAIL_USERNAME")
 	gmailPassword := os.Getenv("GMAIL_PASSWORD")
 
